@@ -7,25 +7,18 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "MRStopableView.h"
 
 
 /**
  You use the MRCircularProgressView class to depict the progress of a task over time.
  */
-@interface MRCircularProgressView : UIControl
-
-/**
- A Boolean value that controls whether the receiver shows a stop button.
- 
- If the value of this property is NO (the default), the receiver doesnot show a stop button. If the mayStop property is
- YES a stop button will be shown. You can catch fired events like known from UIControl.
- */
-@property (nonatomic, assign) BOOL mayStop;
+@interface MRCircularProgressView : UIView<MRStopableView>
 
 /**
  Current progress.
  
- Use associated setter for non animated changes. Otherwises use setProgress:aniamted:.
+ Use associated setter for non animated changes. Otherwises use setProgress:animated:.
  */
 @property (nonatomic, assign) float progress;
 
@@ -34,7 +27,7 @@
  
  Default is 0.3s. Must be larger than zero.
  */
-@property (nonatomic, assign) CFTimeInterval animationDuration;
+@property (nonatomic, assign) CFTimeInterval animationDuration UI_APPEARANCE_SELECTOR;
 
 /**
  Change progress animated.

@@ -17,6 +17,10 @@
 
 @implementation MRProgressOverlayTableViewController
 
++ (void)load {
+    [MRProgressOverlayView appearanceWhenContainedIn:UIImageView.class, nil].titleLabelText = @"Waiting ...";
+}
+
 - (UIView *)rootView {
     return self.delegate.viewForProgressOverlay;
 }
@@ -30,8 +34,46 @@
     } afterDelay:2.0];
 }
 
+- (IBAction)onShowIndeterminateMayStopProgressView:(id)sender {
+    MRProgressOverlayView *progressView = [MRProgressOverlayView new];
+    progressView.mode = MRProgressOverlayViewModeDeterminateCircular;
+    progressView.stopBlock = ^(MRProgressOverlayView *view){
+        [view dismiss:YES];
+    };
+    [self.rootView addSubview:progressView];
+    [self simulateProgressView:progressView];
+}
+
+- (IBAction)onShowIndeterminateNoTextProgressView:(id)sender {
+    MRProgressOverlayView *progressView = [MRProgressOverlayView new];
+    progressView.titleLabelText = @"";
+    [self.rootView addSubview:progressView];
+    [progressView show:YES];
+    [self performBlock:^{
+        [progressView dismiss:YES];
+    } afterDelay:2.0];
+}
+
 - (IBAction)onShowDeterminateCircularProgressView:(id)sender {
     MRProgressOverlayView *progressView = [MRProgressOverlayView new];
+    progressView.mode = MRProgressOverlayViewModeDeterminateCircular;
+    [self.rootView addSubview:progressView];
+    [self simulateProgressView:progressView];
+}
+
+- (IBAction)onShowDeterminateCircularMayStopProgressView:(id)sender {
+    MRProgressOverlayView *progressView = [MRProgressOverlayView new];
+    progressView.mode = MRProgressOverlayViewModeDeterminateCircular;
+    progressView.stopBlock = ^(MRProgressOverlayView *view){
+        [view dismiss:YES];
+    };
+    [self.rootView addSubview:progressView];
+    [self simulateProgressView:progressView];
+}
+
+- (IBAction)onShowDeterminateCircularNoTextProgressView:(id)sender {
+    MRProgressOverlayView *progressView = [MRProgressOverlayView new];
+    progressView.titleLabelText = @"";
     progressView.mode = MRProgressOverlayViewModeDeterminateCircular;
     [self.rootView addSubview:progressView];
     [self simulateProgressView:progressView];
@@ -97,6 +139,15 @@
     } afterDelay:2.0];
 }
 
+- (IBAction)onShowSmallProgressViewWithoutTitleLabelText:(id)sender {
+    MRProgressOverlayView *progressView = [MRProgressOverlayView showOverlayAddedTo:self.rootView animated:YES];
+    progressView.mode = MRProgressOverlayViewModeIndeterminateSmall;
+    progressView.titleLabelText = @"";
+    [self performBlock:^{
+        [progressView dismiss:YES];
+    } afterDelay:2.0];
+}
+
 - (IBAction)onShowAlertView:(id)sender {
     [[[UIAlertView alloc] initWithTitle:@"Native Alert View" message:@"Just to compare blur effects." delegate:nil cancelButtonTitle:@"OK" otherButtonTitles:nil] show];
 }
@@ -119,10 +170,14 @@
                             [self performBlock:^{
                                 if (++i%2==1) {
                                     progressView.mode = MRProgressOverlayViewModeCheckmark;
-                                    progressView.titleLabelText = @"Succeed";
+                                    if (progressView.titleLabel.text.length > 0) {
+                                        progressView.titleLabelText = @"Succeed";
+                                    }
                                 } else {
                                     progressView.mode = MRProgressOverlayViewModeCross;
-                                    progressView.titleLabelText = @"Failed";
+                                    if (progressView.titleLabel.text.length > 0) {
+                                        progressView.titleLabelText = @"Failed";
+                                    }
                                 }
                                 [self performBlock:^{
                                     [progressView dismiss:YES];

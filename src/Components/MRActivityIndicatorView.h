@@ -7,13 +7,14 @@
 //
 
 #import <UIKit/UIKit.h>
+#import "MRStopableView.h"
 
 
 /**
  Use an activity indicator to show that a task is in progress. An activity indicator appears as a circle slice that is
  either spinning or stopped.
  */
-@interface MRActivityIndicatorView : UIControl {
+@interface MRActivityIndicatorView : UIView<MRStopableView> {
 @package
     BOOL _animating;
 }
@@ -23,7 +24,7 @@
  
  The default value is 2.f. 
  */
-@property (nonatomic) CGFloat lineWidth;
+@property (nonatomic) CGFloat lineWidth UI_APPEARANCE_SELECTOR;
 
 /**
  A Boolean value that controls whether the receiver is hidden when the animation is stopped.

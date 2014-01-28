@@ -67,10 +67,10 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
 #pragma mark - Static helper methods
 
 + (instancetype)showOverlayAddedTo:(UIView *)view animated:(BOOL)animated {
-   MRProgressOverlayView *overlayView = [self new];
-   [view addSubview:overlayView];
-   [overlayView show:animated];
-   return overlayView;
+    MRProgressOverlayView *overlayView = [self new];
+    [view addSubview:overlayView];
+    [overlayView show:animated];
+    return overlayView;
 }
 
 + (instancetype)showOverlayAddedTo:(UIView *)view title:(NSString *)title mode:(MRProgressOverlayViewMode)mode animated:(BOOL)animated {
@@ -82,43 +82,60 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
     return overlayView;
 }
 
++ (instancetype)showOverlayAddedTo:(UIView *)view title:(NSString *)title mode:(MRProgressOverlayViewMode)mode animated:(BOOL)animated stopBlock:(MRProgressOverlayViewStopBlock)stopBlock {
+    MRProgressOverlayView *overlayView = [self new];
+    overlayView.mode = mode;
+    overlayView.titleLabelText = title;
+    overlayView.stopBlock = stopBlock;
+    [view addSubview:overlayView];
+    [overlayView show:animated];
+    return overlayView;
+}
+
 + (BOOL)dismissOverlayForView:(UIView *)view animated:(BOOL)animated {
-   MRProgressOverlayView *overlayView = [self overlayForView:view];
-   if (overlayView) {
-       [overlayView dismiss:animated];
-       return YES;
-   }
-   return NO;
+    return [self dismissOverlayForView:view animated:animated completion:nil];
+}
+
++ (BOOL)dismissOverlayForView:(UIView *)view animated:(BOOL)animated completion:(void(^)())completionBlock {
+    MRProgressOverlayView *overlayView = [self overlayForView:view];
+    if (overlayView) {
+        [overlayView dismiss:animated completion:completionBlock];
+        return YES;
+    }
+    return NO;
 }
 
 + (NSUInteger)dismissAllOverlaysForView:(UIView *)view animated:(BOOL)animated {
-   NSArray *views = [self allOverlaysForView:view];
-   for (MRProgressOverlayView *overlayView in views) {
-       [overlayView dismiss:animated];
-       return YES;
-   }
-   return views.count;
+    return [self dismissAllOverlaysForView:view animated:animated completion:nil];
+}
+
++ (NSUInteger)dismissAllOverlaysForView:(UIView *)view animated:(BOOL)animated completion:(void(^)())completionBlock {
+    NSArray *views = [self allOverlaysForView:view];
+    for (MRProgressOverlayView *overlayView in views) {
+        [overlayView dismiss:animated completion:completionBlock];
+    }
+    return views.count;
 }
 
 + (instancetype)overlayForView:(UIView *)view {
-   NSEnumerator *subviewsEnum = view.subviews.reverseObjectEnumerator;
-   for (UIView *subview in subviewsEnum) {
-       if ([subview isKindOfClass:self]) {
-           return (MRProgressOverlayView *)subview;
-       }
-   }
-   return nil;
+    NSEnumerator *subviewsEnum = view.subviews.reverseObjectEnumerator;
+    for (UIView *subview in subviewsEnum) {
+        if ([subview isKindOfClass:self]) {
+            return (MRProgressOverlayView *)subview;
+        }
+    }
+    return nil;
 }
 
 + (NSArray *)allOverlaysForView:(UIView *)view {
-   NSMutableArray *overlays = [NSMutableArray new];
-   NSArray *subviews = view.subviews;
-   for (UIView *view in subviews) {
-       if ([view isKindOfClass:self]) {
-           [overlays addObject:view];
-       }
-   }
-   return overlays;
+    NSMutableArray *overlays = [NSMutableArray new];
+    NSArray *subviews = view.subviews;
+    for (UIView *view in subviews) {
+        if ([view isKindOfClass:self]) {
+            [overlays addObject:view];
+        }
+    }
+    return overlays;
 }
 
 
@@ -274,6 +291,13 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
     UIView *modeView = [self createViewForMode:self.mode];
     self.modeView = modeView;
     modeView.tintColor = self.tintColor;
+    
+    if ([modeView conformsToProtocol:@protocol(MRStopableView)]
+        && [modeView respondsToSelector:@selector(stopButton)]) {
+        UIButton *stopButton = [((id<MRStopableView>)modeView) stopButton];
+        [stopButton addTarget:self action:@selector(modeViewStopButtonTouchUpInside) forControlEvents:UIControlEventTouchUpInside];
+    }
+    
     return modeView;
 }
 
@@ -368,7 +392,11 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
 #pragma mark - Title label text
 
 - (NSDictionary *)titleTextAttributesToCopy {
-    return [self.titleLabel.attributedText attributesAtIndex:0 effectiveRange:NULL];
+    if (self.titleLabel.text.length > 0) {
+        return [self.titleLabel.attributedText attributesAtIndex:0 effectiveRange:NULL];
+    } else {
+        return @{};
+    }
 }
 
 - (void)setTitleLabelText:(NSString *)titleLabelText {
@@ -432,6 +460,33 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
 }
 
 
+#pragma mark - Stop button
+
+- (void)setStopBlock:(MRProgressOverlayViewStopBlock)stopBlock {
+    _stopBlock = stopBlock;
+    
+    BOOL mayStop = stopBlock != nil;
+    if ([self.modeView conformsToProtocol:@protocol(MRStopableView)]
+        && [self.modeView respondsToSelector:@selector(setMayStop:)]) {
+        [((id<MRStopableView>)self.modeView) setMayStop:mayStop];
+    } else {
+        #if DEBUG
+            NSLog(@"** WARNING - %@: %@ is only valid to call when the mode view supports %@ declared in %@!",
+                  NSStringFromClass(self.class),
+                  NSStringFromSelector(_cmd),
+                  NSStringFromSelector(@selector(setMayStop:)),
+                  NSStringFromProtocol(@protocol(MRStopableView)));
+        #endif
+    }
+}
+
+- (void)modeViewStopButtonTouchUpInside {
+    if (self.stopBlock) {
+        self.stopBlock(self);
+    }
+}
+
+
 #pragma mark - Transitions
 
 - (void)setSubviewTransform:(CGAffineTransform)transform alpha:(CGFloat)alpha {
@@ -468,8 +523,15 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
 }
 
 - (void)dismiss:(BOOL)animated {
+    [self dismiss:animated completion:nil];
+}
+
+- (void)dismiss:(BOOL)animated completion:(void(^)())completionBlock {
     [self hide:animated completion:^{
         [self removeFromSuperview];
+        if (completionBlock) {
+            completionBlock();
+        }
     }];
 }
 
@@ -530,25 +592,31 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
     const CGFloat modePadding = 30;
     const CGFloat dialogMargin = 10;
     const CGFloat dialogMinWidth = 150;
+    
     const BOOL hasSmallIndicator = self.mode == MRProgressOverlayViewModeIndeterminateSmall
-    || self.mode == MRProgressOverlayViewModeIndeterminateSmallDefault;
+        || self.mode == MRProgressOverlayViewModeIndeterminateSmallDefault;
+    const BOOL isTextNonEmpty = self.titleLabel.text.length > 0;
+    
     CGFloat dialogWidth = hasSmallIndicator ? CGRectGetWidth(bounds) - dialogMargin * 2 : dialogMinWidth;
     if (self.mode == MRProgressOverlayViewModeCustom) {
         dialogWidth = self.modeView.frame.size.width + 2*modePadding;
     }
     
-    CGFloat y = 7;
+    CGFloat y = (isTextNonEmpty || hasSmallIndicator) ? 7 : modePadding;
     
-    if (!self.titleLabel.hidden) {
+    CGSize modeViewSize;
+    if (hasSmallIndicator) {
+        modeViewSize = CGSizeMake(20, 20);
+    }
+    
+    if (!self.titleLabel.hidden && isTextNonEmpty) {
         const CGFloat innerViewWidth = dialogWidth - 2*dialogPadding;
         
         CGFloat titleLabelMinX = dialogPadding;
         CGFloat titleLabelMaxWidth = innerViewWidth;
         CGFloat offset = 0;
         
-        CGSize modeViewSize;
         if (hasSmallIndicator) {
-            modeViewSize = CGSizeMake(20, 20);
             offset = modeViewSize.width + 7;
         }
         
@@ -567,7 +635,7 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
         if (hasSmallIndicator) {
             CGFloat titleLabelMinWidth = dialogMinWidth - 2*dialogPadding - offset;
             if (titleLabelSize.width > titleLabelMinWidth) {
-                dialogWidth = titleLabelSize.width + offset + 2* dialogPadding;
+                dialogWidth = titleLabelSize.width + offset + 2*dialogPadding;
                 titleLabelOrigin = CGPointMake(titleLabelMinX, y);
             } else {
                 dialogWidth = dialogMinWidth;
@@ -584,7 +652,16 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
         
         CGRect titleLabelFrame = {titleLabelOrigin, titleLabelSize};
         self.titleLabel.frame = titleLabelFrame;
+        
         y += CGRectGetMaxY(titleLabelFrame);
+    } else if (hasSmallIndicator) {
+        dialogWidth = modeViewSize.width + 2*y;
+        
+        CGPoint modeViewOrigin = CGPointMake(y, y);
+        CGRect modeViewFrame = {modeViewOrigin, modeViewSize};
+        self.modeView.frame = modeViewFrame;
+        
+        y += CGRectGetMaxY(modeViewFrame);
     }
     
     if (!hasSmallIndicator) {
@@ -595,7 +672,7 @@ static void *MRProgressOverlayViewObservationContext = &MRProgressOverlayViewObs
         
         if (self.mode != MRProgressOverlayViewModeDeterminateHorizontalBar) {
             modeViewFrame = CGRectMake(modePadding, y, innerViewWidth, innerViewWidth);
-            paddingBottom = 20;
+            paddingBottom = isTextNonEmpty ? 20 : modePadding;
         } else {
             modeViewFrame = CGRectMake(10, y, dialogWidth-20, 5);
             paddingBottom = 15;
